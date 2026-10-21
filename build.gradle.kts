@@ -328,7 +328,7 @@ val integrationTestMinecraftVersion =
     (findProperty("integrationTestMinecraftVersion") as String?) ?: "1.19.2"
 
 val defaultIntegrationTestVersions =
-    listOf(integrationTestMinecraftVersion, "26.1.2", "1.21.11", "1.12", "1.9.4")
+    listOf(integrationTestMinecraftVersion, "26.3", "26.1.2", "1.21.11", "1.12", "1.9.4")
         .distinct()
 
 val integrationTestVersions: List<String> =

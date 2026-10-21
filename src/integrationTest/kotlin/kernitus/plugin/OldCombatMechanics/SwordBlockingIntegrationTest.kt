@@ -8,9 +8,11 @@ package kernitus.plugin.OldCombatMechanics
 
 import io.kotest.common.ExperimentalKotest
 import io.kotest.core.spec.style.StringSpec
+import io.kotest.core.test.Enabled
 import io.kotest.core.test.TestScope
 import io.kotest.matchers.shouldBe
 import kernitus.plugin.OldCombatMechanics.module.ModuleSwordBlocking
+import kernitus.plugin.OldCombatMechanics.paper.PaperSwordBlocking
 import kernitus.plugin.OldCombatMechanics.utilities.Config
 import kotlinx.coroutines.delay
 import org.bukkit.Bukkit
@@ -225,6 +227,78 @@ class SwordBlockingIntegrationTest :
                 println("Skipping: Paper data component API unavailable")
             } else {
                 paperConsumablePathAvailable() shouldBe true
+            }
+        }
+
+        "native consumable fallback reads absent foreign and removed components without changing the sword".config(
+            enabledOrReasonIf = {
+                val available =
+                    try {
+                        Class.forName("io.papermc.paper.datacomponent.DataComponentTypes")
+                        true
+                    } catch (_: ClassNotFoundException) {
+                        false
+                    }
+                Enabled(available, "Paper data component API unavailable")
+            },
+        ) {
+            runSync {
+                // Keep the module's live adapter untouched and force this instance down its native read path.
+                val adapter = PaperSwordBlocking()
+                val paperHasData = PaperSwordBlocking::class.java.getDeclaredField("paperHasData")
+                paperHasData.isAccessible = true
+                paperHasData.set(adapter, null)
+
+                val craftItemStack = Class.forName("org.bukkit.craftbukkit.inventory.CraftItemStack")
+                val nmsItemStack = Class.forName("net.minecraft.world.item.ItemStack")
+                val mirrorMethod =
+                    try {
+                        craftItemStack.getMethod("asCraftMirror", nmsItemStack)
+                    } catch (_: NoSuchMethodException) {
+                        craftItemStack.getMethod("asBukkitMirror", nmsItemStack)
+                    }
+                val nativeSword =
+                    craftItemStack
+                        .getMethod("asNMSCopy", ItemStack::class.java)
+                        .invoke(null, ItemStack(Material.DIAMOND_SWORD))
+                val sword = mirrorMethod.invoke(null, nativeSword) as ItemStack
+                craftItemStack.isInstance(sword) shouldBe true
+                val handle = craftItemStack.getDeclaredField("handle")
+                handle.isAccessible = true
+                (handle.get(sword) === nativeSword) shouldBe true
+                val metadata = checkNotNull(sword.itemMeta)
+                metadata.setDisplayName("Foreign sword metadata")
+                sword.itemMeta = metadata
+
+                val componentType = Class.forName("io.papermc.paper.datacomponent.DataComponentType")
+                val valuedType = Class.forName("io.papermc.paper.datacomponent.DataComponentType\$Valued")
+                val consumableType =
+                    Class
+                        .forName("io.papermc.paper.datacomponent.DataComponentTypes")
+                        .getField("CONSUMABLE")
+                        .get(null)
+                val hasData = ItemStack::class.java.getMethod("hasData", componentType)
+                val getData = ItemStack::class.java.getMethod("getData", valuedType)
+                val setData = ItemStack::class.java.getMethod("setData", valuedType, Any::class.java)
+                val unsetData = ItemStack::class.java.getMethod("unsetData", componentType)
+                val foreignConsumable = checkNotNull(getData.invoke(ItemStack(Material.BREAD), consumableType))
+
+                fun assertReadOnlyPresence(expected: Boolean) {
+                    val before = sword.clone()
+                    hasData.invoke(sword, consumableType) shouldBe expected
+                    adapter.hasConsumableComponent(sword) shouldBe expected
+                    sword shouldBe before
+                }
+
+                assertReadOnlyPresence(false)
+                // A food component supplies an independent foreign value, rather than the adapter's BLOCK value.
+                setData.invoke(sword, consumableType, foreignConsumable)
+                assertReadOnlyPresence(true)
+                getData.invoke(sword, consumableType) shouldBe foreignConsumable
+                unsetData.invoke(sword, consumableType)
+                assertReadOnlyPresence(false)
+                getData.invoke(sword, consumableType) shouldBe null
+                sword.itemMeta?.displayName shouldBe "Foreign sword metadata"
             }
         }
 

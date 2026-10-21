@@ -1147,9 +1147,11 @@ class MixedModePvPIntegrationTest :
                     runSync {
                         setModeset(attacker, "old")
                         setModeset(defender, "new")
+                        // Put the hook opposite the rodder so direction must come from the rodder.
+                        attacker.teleport(defender.location.clone().add(1.5, 0.0, 0.0))
                         val (target, targetVelocity) = createVelocityRecordingPlayer(defender)
 
-                        val hook = createFakeHook(attacker, target.location.clone().add(0.1, 0.0, 0.0), target)
+                        val hook = createFakeHook(attacker, target.location.clone().add(-0.1, 0.0, 0.0), target)
                         val event = createProjectileHitEvent(hook, target)
                         oldFishingKnockbackModule.onRodLand(event)
 

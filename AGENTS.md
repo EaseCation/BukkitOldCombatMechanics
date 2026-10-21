@@ -30,12 +30,12 @@ This file holds always-on repository guidance and routing hints. Detailed workfl
 - Build tool: Gradle wrapper, currently 9.8.0.
 - JDKs used locally: 8, 11, 17, 25.
 - Main integration tests live in `src/integrationTest/kotlin` and are packaged into `OldCombatMechanics-<version>-tests.jar`.
-- Entrypoint test plugin class: `kernitus.plugin.OldCombatMechanics.OCMTestMain`.
+- Entrypoint test plugin class: `kernitus.plugin.OldCombatMechanics.OCMTestMain`. It creates the shared test data folder before running any spec, including on fresh servers.
 - PacketEvents is shaded into the main plugin; integration tests resolve PacketEvents from that shaded copy rather than injecting a separate external packet library.
 
 ## Build and validation quick reference
 
-- Full integration matrix: `./gradlew integrationTest`.
+- Full integration matrix: `./gradlew integrationTest`. The default matrix includes 26.3 alongside 26.1.2, 1.21.11, 1.19.2, 1.12 and 1.9.4.
 - Selected versions: `./gradlew integrationTest -PintegrationTestVersions=1.19.2,1.21.11,1.12`.
 - A single-version integration run can use `-PintegrationTestServerJar=build/test-servers/<server>.jar` to exercise a local Paper-compatible server such as Purpur.
 - Matrix task examples: `integrationTest1_19_2`, `integrationTest1_21_11`, `integrationTest1_12`, `integrationTest1_9`.
@@ -58,7 +58,7 @@ This file holds always-on repository guidance and routing hints. Detailed workfl
 
 ## Current project state
 
-- The 2.7.0 section in `CHANGELOG.md` contains curated user-facing release notes. Keep the matching Release Please PR section synchronised before release, including the issue-reporting footer and the documented sweep and Bukkit 1.9 cooldown limitations.
+- The 2.8.0 and 2.7.0 sections in `CHANGELOG.md` contain curated user-facing release notes. Keep the matching Release Please PR section synchronised before release, including the issue-reporting footer and the documented sweep and Bukkit 1.9 cooldown limitations.
 - Legacy fake players have dedicated 1.9 and 1.12 implementations; use focused native-flight validation when changing legacy projectiles.
 - Java 8 compatibility is required for main code. Avoid APIs such as records, pattern matching, `Stream.toList()`, and `Set.of`/`List.of` in Java 8-targeted code.
 - Main Java/Kotlin compilation targets Java 8 (`options.release.set(8)`, Kotlin `jvmTarget = 1.8`).
@@ -79,7 +79,7 @@ This file holds always-on repository guidance and routing hints. Detailed workfl
 - Generic launch attribution requires genuine native item dispatch, the actual held Craft stack identity and an unborn projectile. Paper throwable events identify main-hand use even with identical offhand items. Bow events retain their observed original identity and reject ordinary API replacements. Arbitrary reflective construction of unborn replacement entities before the first listener cannot be distinguished by the Bukkit event API. Unsupported native attribution preserves native launches, including generic legacy launches.
 - Generic launch contexts capture cloned native inheritance and original launch geometry at the first attributed LOWEST observer. Later movement, ground-state, Paper flag, teleport and stance changes cannot alter that launch snapshot. Earlier foreign changes remain indistinguishable. Nested event redispatch cannot consume an outer context; cancellation and reload clear pending contexts.
 - `ProjectileInsertion` shares the existing modern pre-insertion and legacy post-add safeguards between potion and generic offsets, caching native handles per Craft wrapper. Its next-tick fallback preserves travelled distance but approximates the first collision; empty pending maps cancel their task even after late launch cancellation. Native movement bridges inspect returned handle classes, because covariant Craft bridge methods can declare interface return types.
-- `ProjectileLaunchFidelityIntegrationTest` uses actual held native stacks, real bow release and native connection movement packets. Its origin chunk is loaded and temporarily force-loaded where supported, because fake connections do not reliably keep fixtures ticking outside native spawn; cleanup restores the previous force-loaded flag. Newer fake clients send the genuine player-loaded acknowledgement before moving. The dedicated 8192-launch distribution case records disabled native controls and checks Gaussian variance and fourth moment; small-batch checks alone cannot distinguish triangular from Gaussian spread. Crossbow and trident cases explicitly record absent-item skips on legacy servers.
+- `ProjectileLaunchFidelityIntegrationTest` uses actual held native stacks, real bow release and native connection movement packets. Its origin chunk is loaded and temporarily force-loaded where supported, because fake connections do not reliably keep fixtures ticking outside native spawn; cleanup restores the previous force-loaded flag. Newer fake clients send the genuine player-loaded acknowledgement before moving. Teleport acknowledgements detect the packet constructor and include the pending native position and player rotation when required (including 26.3). Movement packets finish with the detected native client tick-end packet so subsequent positions satisfy the server protocol. The dedicated 8192-launch distribution case records disabled native controls and checks Gaussian variance and fourth moment; small-batch checks alone cannot distinguish triangular from Gaussian spread. Crossbow and trident cases explicitly record absent-item skips on legacy servers.
 - `fishing-rod-velocity.gravity` defaults to 0.04. The legacy 1.8 and 1.9 hook uses 0.04; the rewritten hook (already present in 1.12) uses 0.03, detected through its enum state machine. Custom gravity preserves native water handling.
 - Sword-blocking reload clears pending legacy restores for disabled players independently of Paper component support, restoring only marked temporary shields or exact captured native stack identities on pre-PDC servers (including 1.9 and 1.12); foreign replacement slots remain untouched. Blocking fishing fixtures stop native item use before replacing inventory and verify that an activated replacement shield remains the actual held native stack after native ticks. Fishing water checks wrap the real scheduled gravity runnable once per execution, restoring it afterwards, and record the same-tick native age and velocity boundaries; equal-tick scheduler registration order is not reliable on 1.9.4.
 - `OldPotionThrowingIntegrationTest` and `FishingGravityIntegrationTest` invoke real native item use and record consecutive native flight positions. Their shared helper does not synthesise launch events or advance entity ticks manually.
@@ -101,6 +101,7 @@ This file holds always-on repository guidance and routing hints. Detailed workfl
 - When adding new integration test specs, add them to the explicit `.withClasses(...)` list in `KotestRunner` because autoscan is disabled.
 - New classes should be written in Kotlin by default where practical, matching `.github/CONTRIBUTING.md`.
 
+- Paper sword-blocking consumable detection uses the effective native item component as its fallback when the Paper accessor is unavailable, avoiding removed patch APIs on 26.3. Component fixtures detect native Craft mirror conversion and retain absent, explicitly removed and foreign component checks.
 - Paper sword-blocking damage reduction has optional amount and percentage overrides under `sword-blocking`; each missing option independently inherits its shield counterpart. Config upgrades preserve explicitly configured overrides, including zero, and leave missing overrides absent. Native shield settings and legacy temporary shields remain unchanged.
 - Potion duration seconds may be fractional; conversion rounds once to the nearest tick after multiplication by 20. Integer durations retain their previous values.
 
@@ -109,6 +110,8 @@ This file holds always-on repository guidance and routing hints. Detailed workfl
 - Tool damage tooltip `enabled` controls both native display and lore. Native display only changes default-derived Paper attribute components; explicit foreign components retain their state and use lore. Owned displays preserve numeric attributes and restore default component state. Held-item lifecycle events clear owned tooltips when items leave the active hand. Config version 78 adds the native option after the golden apple version 77 upgrade.
 
 ## Integration test essentials
+
+- Modern configuration migration fixtures remove obsolete per-module `enabled` keys before asserting modern assignments. Mixed-mode fishing direction fixtures put the hook opposite the rodder so the expected knockback proves rodder-based attribution.
 
 - Native sweep coverage separately checks equal-hit immunity, fully and partially consumed absorption, and increasing Sweeping Edge damage followed by a weaker hit. Increasing-overdamage snapshots record incoming damage, restored damage history, immunity ticks, applied Bukkit damage and actual health. Configurable damage modules are disabled for independent native controls; these can suppress a weaker hit before Bukkit emits an event, while the enabled OCM pipeline emits and cancels that hit.
 - Sweep absorption fixtures provision the optional native `MAX_ABSORPTION` attribute. History snapshots detect the optional `INVULNERABILITY_REDUCTION` modifier because newer native events retain full Bukkit BASE damage and expose immunity reduction separately. Ordinary legacy sweeps identify the secondary victim even when the native cause is shared with primary attacks. Sweeping Edge cases and Bukkit persistent-data cases use explicit Kotest capability skips only when their underlying feature is absent; `weapon-baseline-capabilities.txt` records the reasons.

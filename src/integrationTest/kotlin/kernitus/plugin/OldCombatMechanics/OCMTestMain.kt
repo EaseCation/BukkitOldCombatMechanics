@@ -14,6 +14,7 @@ import java.util.logging.Level
 
 class OCMTestMain : JavaPlugin() {
     override fun onEnable() {
+        check(dataFolder.isDirectory || dataFolder.mkdirs()) { "Could not create integration test data folder" }
         logger.info("Enabled OCMTest plugin")
 
         // Initialise player data storage

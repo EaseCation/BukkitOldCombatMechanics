@@ -257,6 +257,7 @@ class ConfigMigrationIntegrationTest :
                     val oldConfig = YamlConfiguration.loadConfiguration(configFile)
                     oldConfig.set("config-version", oldConfig.getInt("config-version") - 1)
                     oldConfig.set("force-below-1-18-1-config-upgrade", true)
+                    ModuleLoader.getModules().forEach { oldConfig.set("${it.configName}.enabled", null) }
                     val section = oldConfig.getConfigurationSection("modesets")!!
                     val modesetModules = section.getKeys(false).flatMap { section.getStringList(it) }
                     val always =

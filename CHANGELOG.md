@@ -3,22 +3,29 @@
 ## [2.8.0](https://github.com/kernitus/BukkitOldCombatMechanics/compare/v2.7.0...v2.8.0) (2026-10-20)
 
 
-### Features
+This release adds optional legacy projectile launches, visible golden apple cooldowns and independent Paper sword-blocking settings, and improves tooltips, regeneration and knockback.
 
-* **golden-apples:** show apple cooldowns on the item like ender pearls ([#966](https://github.com/kernitus/BukkitOldCombatMechanics/issues/966)) ([#967](https://github.com/kernitus/BukkitOldCombatMechanics/issues/967)) ([b7734cf](https://github.com/kernitus/BukkitOldCombatMechanics/commit/b7734cf7ef736d577d401498b7e37b8fcbf8f952))
-* **projectiles:** add legacy trajectory, launch offset and motion options ([48520d6](https://github.com/kernitus/BukkitOldCombatMechanics/commit/48520d6b896864b494c9e7b005865a9182a49556))
-* **sword-blocking:** configure Paper sword reduction independently ([#975](https://github.com/kernitus/BukkitOldCombatMechanics/issues/975)) ([db2302d](https://github.com/kernitus/BukkitOldCombatMechanics/commit/db2302d05ff0833d4dd8465bf93a38e42d63d340))
+### Configuration
 
+- Added `old-projectile-trajectory`, `projectile-shoot-offset` and `relative-projectile-velocity` for legacy launch spread, launch position and inherited player movement. All three modules are disabled by default, including when upgrading unassigned entries. Enable the modules you want through the normal module groups or modesets. Enabled `old-potion-throwing` continues to control player splash-potion launches independently.
+- Added `projectile-launch.custom-bows`, empty by default, for additional registered native bow materials on server forks. Vanilla bows remain eligible. Custom bows require genuine native bow dispatch; listing an ordinary item does not turn it into a bow. Custom-bow launch correction has not yet been verified on a compatible server fork. [#970](https://github.com/kernitus/BukkitOldCombatMechanics/issues/970).
+- Added `old-golden-apples.cooldown.show-item-cooldown` to show the native item cooldown overlay and prevent eating while it counts down. It defaults to `false` and requires separate normal and enchanted apple materials, available from Minecraft 1.13. [#966](https://github.com/kernitus/BukkitOldCombatMechanics/issues/966).
+- Paper sword blocking now accepts optional `sword-blocking.generalDamageReductionAmount` and `generalDamageReductionPercentage` overrides. Each omitted setting independently inherits its shield counterpart. Actual shields and the legacy temporary-shield fallback retain their existing settings. [#972](https://github.com/kernitus/BukkitOldCombatMechanics/issues/972).
 
-### Bug Fixes
+### Fixes
 
-* **blocking:** clear legacy shield state safely on reload ([7814048](https://github.com/kernitus/BukkitOldCombatMechanics/commit/7814048083958636201312e5d881a9dfad87cf89))
-* **combat:** restore fractional blocking and accurate fishing knockback ([0922b81](https://github.com/kernitus/BukkitOldCombatMechanics/commit/0922b814a5b6f39728cb88332f0e17682448db93))
-* **knockback:** restore arrow base motion while preserving native Punch ([ecc31a0](https://github.com/kernitus/BukkitOldCombatMechanics/commit/ecc31a00bde916e60d2076f45e10e668ac60131a))
-* **potions:** retain fractional potion durations ([#973](https://github.com/kernitus/BukkitOldCombatMechanics/issues/973)) ([#974](https://github.com/kernitus/BukkitOldCombatMechanics/issues/974)) ([72572d4](https://github.com/kernitus/BukkitOldCombatMechanics/commit/72572d4dfce54cbcd10c9b60992a6747af17b333))
-* **projectiles:** configure native custom bows for legacy launches ([#970](https://github.com/kernitus/BukkitOldCombatMechanics/issues/970)) ([#971](https://github.com/kernitus/BukkitOldCombatMechanics/issues/971)) ([4893dcf](https://github.com/kernitus/BukkitOldCombatMechanics/commit/4893dcfdb5a69789edfc673d66ca6e921841d5bb))
-* **regeneration:** restore native healing intervals and preserve rate ownership ([fe59dd9](https://github.com/kernitus/BukkitOldCombatMechanics/commit/fe59dd9fe6702fb56f5084be76f858fd9d3bc251))
-* **tool-damage:** correct native damage tooltip ([#962](https://github.com/kernitus/BukkitOldCombatMechanics/issues/962)) ([#963](https://github.com/kernitus/BukkitOldCombatMechanics/issues/963)) ([0777794](https://github.com/kernitus/BukkitOldCombatMechanics/commit/07777945811dab472d45b040fd790899b490777b))
+- Corrected configured tool damage tooltips on supported Paper servers without changing the item's combat attributes. `old-tool-damage.tooltip.enabled` controls both native display and lore; foreign item components remain intact and use the lore fallback. Owned tooltips are cleared when items leave the active hand. [#962](https://github.com/kernitus/BukkitOldCombatMechanics/issues/962).
+- Preserved fractional potion durations, rounding to the nearest tick after conversion from seconds. Existing integer durations remain unchanged. [#973](https://github.com/kernitus/BukkitOldCombatMechanics/issues/973).
+- Restored native regeneration intervals and exhaustion handling while preserving regeneration rates and exhaustion changes owned by other plugins. Reloading or disabling the module releases only rates still owned by OCM.
+- Corrected fractional blocking reductions and fishing-rod knockback, including hit attribution, blocked hook paths and cancelled damage. Reloading sword blocking safely restores owned temporary shields without replacing foreign inventory items.
+- Restored arrow base knockback where the server exposes a suitable knockback hook, while retaining native Punch and later motion. Servers without a suitable hook, including 1.9.4 and 1.12, keep native arrow knockback.
+
+### Compatibility notes
+
+- Restored Paper sword-blocking components on Minecraft 26.3, keeping the sword animation instead of falling back to an offhand shield swap.
+- Bukkit 1.9 retains the existing sword-sweep handling and per-tick attack-cooldown fallback. The known sweep damage and same-tick cooldown limitations remain.
+
+Report issues on [GitHub](https://github.com/kernitus/BukkitOldCombatMechanics/issues).
 
 ## [2.7.0](https://github.com/kernitus/BukkitOldCombatMechanics/compare/v2.6.0...v2.7.0) (2026-10-03)
 

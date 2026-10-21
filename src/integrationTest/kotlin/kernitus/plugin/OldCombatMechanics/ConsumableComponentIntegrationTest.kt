@@ -267,9 +267,17 @@ class ConsumableComponentIntegrationTest :
             val craftItemStack = Class.forName("org.bukkit.craftbukkit.inventory.CraftItemStack")
             val nmsItemStackClass = Class.forName("net.minecraft.world.item.ItemStack")
             val asNmsCopy = craftItemStack.getMethod("asNMSCopy", ItemStack::class.java)
-            val asCraftMirror = craftItemStack.getMethod("asCraftMirror", nmsItemStackClass)
+            val asCraftMirror =
+                try {
+                    craftItemStack.getMethod("asCraftMirror", nmsItemStackClass)
+                } catch (_: NoSuchMethodException) {
+                    craftItemStack.getMethod("asBukkitMirror", nmsItemStackClass)
+                }
             val nms = asNmsCopy.invoke(null, ItemStack(type))
-            return asCraftMirror.invoke(null, nms) as ItemStack
+            val mirror = asCraftMirror.invoke(null, nms) as ItemStack
+            craftItemStack.isInstance(mirror) shouldBe true
+            (nmsItemStack(mirror) === nms) shouldBe true
+            return mirror
         }
 
         fun consumablePatchEntry(stack: ItemStack?): Optional<*>? {
@@ -288,11 +296,18 @@ class ConsumableComponentIntegrationTest :
                 if (getMethod != null) {
                     getMethod.invoke(patch, consumableType) as? Optional<*>
                 } else {
-                    val entries = patch.javaClass.getMethod("entrySet").invoke(patch) as? Set<*> ?: return null
-                    entries
-                        .filterIsInstance<Map.Entry<*, *>>()
-                        .firstOrNull { it.key === consumableType }
-                        ?.value as? Optional<*>
+                    // Newer patches expose additions and explicit removals separately.
+                    // An effective item getter would lose the absent-versus-removed distinction.
+                    val split = patch.javaClass.getMethod("split").invoke(patch)
+                    val removed = split.javaClass.getMethod("removed").invoke(split) as Set<*>
+                    if (removed.contains(consumableType)) {
+                        Optional.empty<Any>()
+                    } else {
+                        val added = split.javaClass.getMethod("added").invoke(split)
+                        val componentMap = Class.forName("net.minecraft.core.component.DataComponentMap")
+                        val value = componentMap.getMethod("get", dataComponentType).invoke(added, consumableType)
+                        value?.let { Optional.of(it) }
+                    }
                 }
             } catch (t: Throwable) {
                 throw IllegalStateException(

@@ -192,7 +192,39 @@ class ProjectileLaunchFidelityIntegrationTest :
                     "net.minecraft.network.protocol.game." +
                         if (mapped) "ServerboundAcceptTeleportationPacket" else "PacketPlayInTeleportAccept",
                 )
-            val ack = ackType.getConstructor(Int::class.javaPrimitiveType).newInstance(teleport)
+            val legacyAckConstructor =
+                ackType.constructors.firstOrNull {
+                    it.parameterTypes.contentEquals(arrayOf(Int::class.javaPrimitiveType))
+                }
+            val ack =
+                if (legacyAckConstructor != null) {
+                    legacyAckConstructor.newInstance(teleport)
+                } else {
+                    // Newer acknowledgements carry the position and rotation the client accepted.
+                    val expectedPosition =
+                        connection.javaClass
+                            .getDeclaredField("awaitingPositionFromClient")
+                            .apply { isAccessible = true }
+                            .get(connection)
+                    checkNotNull(expectedPosition) { "No pending teleport to acknowledge" }
+                    val rotation = player.location
+                    ackType
+                        .getConstructor(
+                            Int::class.javaPrimitiveType,
+                            Double::class.javaPrimitiveType,
+                            Double::class.javaPrimitiveType,
+                            Double::class.javaPrimitiveType,
+                            Float::class.javaPrimitiveType,
+                            Float::class.javaPrimitiveType,
+                        ).newInstance(
+                            teleport,
+                            expectedPosition.javaClass.getField("x").getDouble(expectedPosition),
+                            expectedPosition.javaClass.getField("y").getDouble(expectedPosition),
+                            expectedPosition.javaClass.getField("z").getDouble(expectedPosition),
+                            rotation.yaw,
+                            rotation.pitch,
+                        )
+                }
             connection.javaClass.methods
                 .single {
                     it.parameterTypes.contentEquals(
@@ -238,6 +270,17 @@ class ProjectileLaunchFidelityIntegrationTest :
                 (nativeMotion().lengthSquared() > 0.001) shouldBe true
             }
             player.isOnGround shouldBe grounded
+            // Finish the genuine client tick before sending another position packet.
+            val tickEndHandler = connection.javaClass.methods.firstOrNull { it.name == "handleClientTickEnd" }
+            if (tickEndHandler != null) {
+                tickEndHandler.invoke(
+                    connection,
+                    tickEndHandler.parameterTypes
+                        .single()
+                        .getConstructor()
+                        .newInstance(),
+                )
+            }
         }
 
         beforeTest {
