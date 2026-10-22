@@ -10,6 +10,7 @@ import kernitus.plugin.OldCombatMechanics.module.OCMModule;
 import kernitus.plugin.OldCombatMechanics.module.ModuleSwordBlocking;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.FishHook;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.event.EventHandler;
@@ -150,7 +151,13 @@ public class EntityDamageByEntityListener extends OCMModule {
             // Call event for the other modules to make their modifications
             plugin.getServer().getPluginManager().callEvent(e);
 
-            if (e.isCancelled()) return;
+            if (e.isCancelled()) {
+                if (damager instanceof FishHook && damagee instanceof LivingEntity) {
+                    // Fishing hits bypass weapon reconstruction but still establish the immunity baseline.
+                    event.setDamage(checkOverdamage((LivingEntity) damagee, event, event.getDamage()));
+                }
+                return;
+            }
 
             // Now we re-calculate damage modified by the modules and set it back to original event
             // Attack components order: (Base + Potion effects, scaled by attack delay) + Critical Hit + (Enchantments, scaled by attack delay)
