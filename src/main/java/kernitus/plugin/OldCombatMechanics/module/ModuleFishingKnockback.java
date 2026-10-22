@@ -10,6 +10,8 @@ import com.cryptomorin.xseries.XEntityType;
 import kernitus.plugin.OldCombatMechanics.utilities.reflection.SpigotFunctionChooser;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
+import org.bukkit.damage.DamageSource;
+import org.bukkit.damage.DamageType;
 import org.bukkit.entity.*;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -98,7 +100,10 @@ public class ModuleFishingKnockback extends OCMModule {
         if (damage < 0)
             damage = 0.0001;
 
-        livingEntity.damage(damage, rodder);
+        livingEntity.damage(damage, DamageSource.builder(DamageType.THROWN)
+                .withDirectEntity(hook)
+                .withCausingEntity(rodder)
+                .build());
         livingEntity.setVelocity(
                 calculateKnockbackVelocity(livingEntity.getVelocity(), livingEntity.getLocation(), hook.getLocation()));
     }
